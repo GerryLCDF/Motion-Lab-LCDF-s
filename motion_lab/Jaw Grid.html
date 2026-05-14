@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Jaw Grid</title>
+    <link rel="icon" href="back.svg" type="image/svg+xml">
+    <style>
+        :root { --accent: #4facfe; --bg-panel: rgba(15, 15, 20, 0.9); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* --- OVERLAY CON DESENFOQUE --- */
+        #menu-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(0px);
+            opacity: 0; pointer-events: none; transition: 0.4s; z-index: 900;
+        }
+        #nav-container.open ~ #menu-overlay { opacity: 1; pointer-events: auto; backdrop-filter: blur(8px); }
+
+        /* --- NAVEGACIÓN --- */
+        #nav-container { position: fixed; bottom: 20px; left: 20px; z-index: 2000; }
+        #menu-toggle { 
+            width: 50px; height: 50px; background: var(--bg-panel); 
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; 
+            cursor: pointer; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; gap: 5px; backdrop-filter: blur(10px); 
+        }
+        #menu-toggle span { width: 25px; height: 3px; background: var(--accent); border-radius: 2px; transition: 0.3s; }
+        #menu-items { 
+            position: absolute; bottom: 65px; left: 0; width: 260px; 
+            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 16px; backdrop-filter: blur(15px); padding: 10px; display: none; flex-direction: column; gap: 5px; 
+        }
+        #nav-container.open #menu-items { display: flex; }
+        #nav-container.open #menu-toggle span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        #nav-container.open #menu-toggle span:nth-child(2) { opacity: 0; }
+        #nav-container.open #menu-toggle span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        .menu-item { text-decoration: none; padding: 12px 15px; color: white; font-size: 13px; border-radius: 8px; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .menu-item:hover { background: rgba(79, 172, 254, 0.2); color: var(--accent); }
+        .menu-item.active { border-left: 3px solid var(--accent); background: rgba(255,255,255,0.05); font-weight: bold; }
+
+        /* --- UI PANEL --- */
+        #ui { 
+            position: absolute; top: 20px; left: 20px; width: 340px; 
+            max-height: 85vh; overflow-y: auto;
+            background: var(--bg-panel); padding: 25px; border-radius: 20px; 
+            color: white; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(15px); z-index: 100; 
+        }
+        #ui::-webkit-scrollbar { width: 4px; }
+        #ui::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 10px; }
+
+        h2 { margin: 0 0 20px 0; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+        .group { margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; }
+        label { display: block; font-size: 10px; margin-bottom: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+        .val-indicator { min-width: 45px; font-family: monospace; color: var(--accent); font-size: 11px; text-align: right; }
+        
+        .color-pair { display: flex; align-items: center; gap: 8px; flex: 1; }
+        input[type="color"] { width: 35px; height: 30px; border: none; border-radius: 4px; cursor: pointer; background: none; }
+        input[type="text"] { width: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 5px; border-radius: 4px; font-family: monospace; font-size: 12px; outline: none; }
+        input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+
+        button { width: 100%; border: none; padding: 12px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 11px; }
+        .btn-swap { background: rgba(79, 172, 254, 0.15); color: var(--accent); border: 1px solid var(--accent); margin-bottom: 10px; }
+        #recordBtn { background: #ff4757; margin-top: 10px; }
+        #stopBtn { background: #333; color: #ff4757; border: 1px solid #ff4757; display: none; margin-top: 8px; }
+        #status { font-size: 10px; text-align: center; color: var(--accent); font-weight: bold; margin-top:12px; text-transform: uppercase; }
+
+        .kofi-button { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(15px); }
+    </style>
+</head>
+<body>
+
+<div id="nav-container">
+    <div id="menu-toggle" onclick="this.parentElement.classList.toggle('open')"><span></span><span></span><span></span></div>
+    <div id="menu-items">
+        <a href="index.html" class="menu-item">SVG Motion</a>
+        <a href="Grid Shader.html" class="menu-item">Grid</a>
+        <a href="Discrete Sunset.html" class="menu-item">Discrete Sunset</a>
+        <a href="Fire background.html" class="menu-item">Fire Background</a>
+        <a href="Bubble Dubble.html" class="menu-item">Bubble Dubble</a>
+        <a href="Moving Circles.html" class="menu-item">Moving Circles Pro</a>
+        <a href="Diamond Pattern.html" class="menu-item">Diamond Pattern</a>
+        <a href="Clouds Pixelated.html" class="menu-item">Clouds Pixelated</a>
+        <a href="#" class="menu-item active">Jaw Grid</a>
+        <a href="Cellular Triangulation.html" class="menu-item">Delaunay Flow</a>         
+        <div class="menu-item locked">other <span class="tag-soon">coming soon...</span></div>
+    </div>
+</div>
+<div id="menu-overlay" onclick="document.getElementById('nav-container').classList.remove('open')"></div>
+
+<div id="ui">
+    <h2>Jaw Grid Pro</h2>
+
+    <div class="group">
+        <label>Colores</label>
+        <div class="row"><span>Fondo:</span><div class="color-pair"><input type="color" id="c_bg" value="#264059"><input type="text" id="h_bg" value="#264059"></div></div>
+        <div class="row"><span>Línea:</span><div class="color-pair"><input type="color" id="c_li" value="#ffffff"><input type="text" id="h_li" value="#FFFFFF"></div></div>
+        <div class="row"><span>Picos:</span><div class="color-pair"><input type="color" id="c_pi" value="#000000"><input type="text" id="h_pi" value="#000000"></div></div>
+        <button class="btn-swap" onclick="swapColors()">INTERCAMBIAR</button>
+    </div>
+
+    <div class="group">
+        <label>Cuadrícula (Fondo)</label>
+        <div class="row"><span style="font-size:10px; flex:1">Velocidad:</span><input type="range" id="v_grid_s" min="0" max="2" step="0.01" value="0.1"><span class="val-indicator" id="v_grid_v">0.1</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Rotación:</span><input type="range" id="rot_g_s" min="0" max="360" value="0"><span class="val-indicator" id="rot_g_v">0°</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Tamaño:</span><input type="range" id="size_s" min="0.01" max="0.5" step="0.01" value="0.05"><span class="val-indicator" id="size_v">0.05</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Grosor:</span><input type="range" id="thin_s" min="0" max="0.1" step="0.001" value="0.005"><span class="val-indicator" id="thin_v">0.005</span></div>
+    </div>
+
+    <div class="group">
+        <label>Picos (Fauces)</label>
+        <div class="row"><span style="font-size:10px; flex:1">Velocidad:</span><input type="range" id="v_picos_s" min="0" max="10" step="0.1" value="1.5"><span class="val-indicator" id="v_picos_v">1.5</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Rotación:</span><input type="range" id="rot_p_s" min="-180" max="180" value="0"><span class="val-indicator" id="rot_p_v">0°</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Cantidad:</span><input type="range" id="picos_n_s" min="1" max="50" value="12"><span class="val-indicator" id="picos_n_v">12</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Intensidad:</span><input type="range" id="inte_s" min="0" max="1.2" step="0.01" value="0.4"><span class="val-indicator" id="inte_v">0.4</span></div>
+        <div class="row"><span style="font-size:10px; flex:1">Cierre:</span><input type="range" id="cier_s" min="0" max="1" step="0.01" value="0.0"><span class="val-indicator" id="cier_v">0.0</span></div>
+    </div>
+
+    <button id="recordBtn" onclick="toggleRecording()">GRABAR 3 MINUTOS</button>
+    <button id="stopBtn" onclick="stopRecordingEarly()">DETENER GRABACIÓN</button>
+    <div id="status">LISTO PARA GRABAR</div>
+</div>
+
+<a href="https://ko-fi.com/gerardom86682" target="_blank" class="kofi-button"><svg viewBox="0 0 24 24" width="28" height="28" fill="white"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.724c-.304 0-.55.245-.55.55v13.746c0 .305.246.55.55.55s.55-.245.55-.55V5.481h17.15c.01 0 3.324.086 3.931 3.3.589 3.12-2.146 3.967-3.483 4.09l.063 1.107c.05 0 4.654-.038 5.446-5.03zm-11.233 1.432c-1.122-1.253-2.946-1.253-4.068 0-1.122 1.252-1.122 3.284 0 4.537L10.5 17l1.92-2.083c1.122-1.253 1.122-3.285 0-4.537z"/></svg></a>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+    let scene, camera, renderer, material;
+    let mediaRecorder, recordedChunks = [], isRecording = false, timerInterval;
+
+    const fragmentShader = `
+        uniform vec2 u_res; uniform float u_time; 
+        uniform vec3 u_color_bg; uniform vec3 u_color_li; uniform vec3 u_color_pi;
+        uniform float u_grid_size; uniform float u_grid_thin; uniform float u_grid_rot;
+        uniform float u_grid_speed;
+        uniform float u_picos_n; uniform float u_picos_inte; uniform float u_picos_cier;
+        uniform float u_picos_rot; uniform float u_picos_speed;
+
+        vec2 rotate_uv(vec2 uv, float degrees, float aspect) {
+            float rad = radians(degrees);
+            mat2 m = mat2(cos(rad), -sin(rad), sin(rad), cos(rad));
+            vec2 p = uv - vec2(0.5 * aspect, 0.5);
+            return (m * p) + vec2(0.5 * aspect, 0.5);
+        }
+
+        void main() {
+            float aspect = u_res.x / u_res.y;
+            vec2 uv_screen = vec2(gl_FragCoord.x / u_res.y, gl_FragCoord.y / u_res.y);
+
+            // Cuadrícula
+            vec2 uv_grid = rotate_uv(uv_screen, u_grid_rot, aspect);
+            uv_grid += u_time * u_grid_speed * vec2(1.0, 0.5);
+            vec2 grid_pos = abs(mod(uv_grid, u_grid_size) - (u_grid_size * 0.5));
+            float grid_line = max(step(grid_pos.x, u_grid_size * u_grid_thin), step(grid_pos.y, u_grid_size * u_grid_thin));
+            vec3 background_layer = mix(u_color_bg, u_color_li, grid_line * 0.15);
+
+            // Picos
+            vec2 uv_picos = rotate_uv(uv_screen, u_picos_rot, aspect);
+            float x_base = (uv_picos.x / aspect) * u_picos_n;
+            float pTime = u_time * u_picos_speed;
+            
+            float r_up = fract(x_base + pTime);
+            float f_up = (r_up < 0.5) ? (r_up / 0.5) : ((1.0 - r_up) / 0.5);
+            float r_dn = fract(x_base - pTime);
+            float f_dn = (r_dn < 0.5) ? (r_dn / 0.5) : ((1.0 - r_dn) / 0.5);
+            
+            float clos = u_picos_cier * 0.5;
+            float up_lim = (f_up * u_picos_inte * (1.0 - u_picos_cier)) + clos;
+            float dn_lim = 1.0 - (f_dn * u_picos_inte * (1.0 - u_picos_cier)) - clos;
+
+            float mask = step(up_lim, uv_picos.y) * step(uv_picos.y, dn_lim);
+            gl_FragColor = vec4(mix(u_color_pi, background_layer, mask), 1.0);
+        }
+    `;
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+material = new THREE.ShaderMaterial({
+    uniforms: {
+        u_time: { value: 0 }, 
+        u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        u_color_bg: { value: new THREE.Color(0x3b5926) }, 
+        u_color_li: { value: new THREE.Color(0xffffff) }, 
+        u_color_pi: { value: new THREE.Color(0x000000) },
+        u_grid_size: { value: 0.19 }, 
+        u_grid_thin: { value: 0.05 }, 
+        u_grid_rot: { value: 159.0 }, 
+        u_grid_speed: { value: 0.03 },
+        u_picos_n: { value: 6.0 }, 
+        u_picos_inte: { value: 0.23 }, 
+        u_picos_cier: { value: 0.0 }, 
+        u_picos_rot: { value: -9.0 }, 
+        u_picos_speed: { value: 0.3 }
+    }, fragmentShader
+});
+        scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+        setupUI(); animate();
+    }
+
+    function setupUI() {
+        const u = material.uniforms;
+        const syncColor = (pId, tId, key) => {
+            const p = document.getElementById(pId), t = document.getElementById(tId);
+            p.oninput = (e) => { t.value = e.target.value.toUpperCase(); u[key].value.set(e.target.value); };
+            t.oninput = (e) => { if(/^#[0-9A-F]{6}$/i.test(e.target.value)) { p.value = e.target.value; u[key].value.set(e.target.value); }};
+        };
+        syncColor('c_bg', 'h_bg', 'u_color_bg'); syncColor('c_li', 'h_li', 'u_color_li'); syncColor('c_pi', 'h_pi', 'u_color_pi');
+
+        const sync = (idS, idV, key, suffix = "") => {
+            const s = document.getElementById(idS), v = document.getElementById(idV);
+            s.oninput = (e) => { v.innerText = e.target.value + suffix; u[key].value = parseFloat(e.target.value); };
+        };
+        sync('v_grid_s', 'v_grid_v', 'u_grid_speed'); sync('rot_g_s', 'rot_g_v', 'u_grid_rot', "°");
+        sync('size_s', 'size_v', 'u_grid_size'); sync('thin_s', 'thin_v', 'u_grid_thin');
+        sync('v_picos_s', 'v_picos_v', 'u_picos_speed'); sync('rot_p_s', 'rot_p_v', 'u_picos_rot', "°");
+        sync('picos_n_s', 'picos_n_v', 'u_picos_n'); sync('inte_s', 'inte_v', 'u_picos_inte');
+        sync('cier_s', 'cier_v', 'u_picos_cier');
+    }
+
+    function swapColors() {
+        const c1 = document.getElementById('c_bg'), c2 = document.getElementById('c_li');
+        const tmp = c1.value; c1.value = c2.value; c2.value = tmp;
+        c1.dispatchEvent(new Event('input')); c2.dispatchEvent(new Event('input'));
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        material.uniforms.u_time.value += 0.02;
+        renderer.render(scene, camera);
+    }
+
+    async function toggleRecording() {
+        if (isRecording) return;
+        const btn = document.getElementById('recordBtn'), stop = document.getElementById('stopBtn'), status = document.getElementById('status');
+        const stream = renderer.domElement.captureStream(60);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 15000000 });
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob), a = document.createElement('a');
+            a.href = url; a.download = `jaw_grid_LCDF_final.webm`; a.click();
+            btn.style.display = "block"; stop.style.display = "none"; isRecording = false; status.innerText = "LISTO PARA GRABAR";
+        };
+        mediaRecorder.start(); isRecording = true;
+        btn.style.display = "none"; stop.style.display = "block";
+        const start = Date.now();
+        timerInterval = setInterval(() => {
+            const rem = 180000 - (Date.now() - start);
+            if (rem <= 0) stopRecordingEarly();
+            else {
+                const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
+                status.innerText = `TIEMPO: ${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        }, 1000);
+    }
+
+    function stopRecordingEarly() { if (mediaRecorder && isRecording) { clearInterval(timerInterval); mediaRecorder.stop(); } }
+    window.onresize = () => { renderer.setSize(window.innerWidth, window.innerHeight); material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight); };
+    init();
+</script>
+</body>
+</html>

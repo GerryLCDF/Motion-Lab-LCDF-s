@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Grid</title>
+    <link rel="icon" href="back.svg" type="image/svg+xml">
+    <style>
+        :root { --accent: #4facfe; --bg-panel: rgba(15, 15, 20, 0.9); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+        
+        /* --- OVERLAY OSCURO --- */
+        #menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.4s;
+            z-index: 900;
+        }
+        #nav-container.open ~ #menu-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* --- MENÚ HAMBURGUESA --- */
+        #nav-container { position: fixed; bottom: 20px; left: 20px; z-index: 1000; }
+
+        #menu-toggle {
+            width: 50px; height: 50px; background: var(--bg-panel);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            cursor: pointer; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; gap: 5px;
+            backdrop-filter: blur(10px); transition: 0.3s;
+        }
+
+        #menu-toggle span { width: 25px; height: 3px; background: var(--accent); border-radius: 2px; transition: 0.3s; }
+
+        #menu-items {
+            position: absolute; bottom: 65px; left: 0; width: 260px;
+            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; backdrop-filter: blur(15px); padding: 10px;
+            display: none; flex-direction: column; gap: 5px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+
+        .menu-item {
+            text-decoration: none; padding: 12px 15px; color: white;
+            font-size: 13px; border-radius: 8px; transition: 0.2s;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        .menu-item:hover:not(.locked) { background: rgba(79, 172, 254, 0.2); color: var(--accent); transform: translateX(5px); }
+        .menu-item.active { border-left: 3px solid var(--accent); background: rgba(255,255,255,0.05); font-weight: bold; }
+        .menu-item.locked { opacity: 0.4; cursor: default; }
+        .tag-soon { font-size: 8px; background: #333; padding: 2px 5px; border-radius: 4px; text-transform: uppercase; color: #eee; }
+
+        /* Estado Abierto */
+        #nav-container.open #menu-items { display: flex; }
+        #nav-container.open #menu-toggle span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        #nav-container.open #menu-toggle span:nth-child(2) { opacity: 0; }
+        #nav-container.open #menu-toggle span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        /* --- PANEL DE CONTROL (UI) --- */
+        #ui {
+            position: absolute; top: 20px; left: 20px; width: 320px;
+            background: var(--bg-panel); padding: 20px;
+            border-radius: 16px; color: white; border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px); max-height: 80vh; overflow-y: auto; z-index: 100;
+        }
+        
+        h2 { margin: 0 0 15px 0; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .group { margin-bottom: 15px; }
+        label { display: block; font-size: 10px; margin-bottom: 8px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        input[type="color"] { width: 35px; height: 28px; border: none; border-radius: 4px; cursor: pointer; background: none; }
+        input[type="text"] { width: 75px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 11px; outline: none; }
+        input[type="range"] { flex: 1; cursor: pointer; accent-color: var(--accent); }
+        input[type="number"] { width: 45px; background: #222; border: 1px solid #444; color: var(--accent); border-radius: 4px; padding: 3px; font-size: 10px; }
+        
+        button { width: 100%; border: none; padding: 10px; color: white; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.3s; font-size: 11px; margin-top: 5px; }
+        .btn-swap { background: rgba(79, 172, 254, 0.15); border: 1px solid var(--accent); color: var(--accent); }
+        
+        #recordBtn { background: var(--accent); color: #000; box-shadow: 0 4px 15px rgba(79, 172, 254, 0.2); }
+        #recordBtn.recording { background: #ff4b2b; color: white; animation: pulse 1.5s infinite; }
+        #status { font-size: 10px; color: var(--accent); margin-top: 10px; text-align: center; font-weight: bold; text-transform: uppercase; }
+
+        .kofi-button { position: fixed; bottom: 20px; right: 20px; width: 55px; height: 55px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; z-index: 100; backdrop-filter: blur(10px); }
+        .kofi-button svg { width: 26px; height: 26px; fill: white; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="nav-container">
+    <div id="menu-toggle" onclick="toggleMenu()">
+        <span></span><span></span><span></span>
+    </div>
+    <div id="menu-items">
+        <a href="index.html" class="menu-item ">SVG Motion</a>
+        <a href="#" class="menu-item active">Grid</a>
+        <a href="Discrete Sunset.html" class="menu-item ">Discrete Sunset</a>
+        <a href="Fire background.html" class="menu-item">Fire Background</a>
+        <a href="Bubble Dubble.html" class="menu-item">Bubble Dubble</a>
+        <a href="Moving Circles.html" class="menu-item">Moving Circles Pro</a>
+        <a href="Diamond Pattern.html" class="menu-item">Diamond Pattern</a>
+        <a href="Clouds Pixelated.html" class="menu-item">Clouds Pixelated</a>
+        <a href="Jaw Grid.html" class="menu-item">Jaw Grid</a>
+        <a href="Cellular Triangulation.html" class="menu-item">Delaunay Flow</a>         
+        <div class="menu-item locked">other <span class="tag-soon">coming soon...</span></div>
+    </div>
+</div>
+
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+
+<a href="https://ko-fi.com/gerardom86682" target="_blank" class="kofi-button" title="Apoyar en Ko-fi">
+    <svg viewBox="0 0 24 24"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.724c-.304 0-.55.245-.55.55v13.746c0 .305.246.55.55.55s.55-.245.55-.55V5.481h17.15c.01 0 3.324.086 3.931 3.3.589 3.12-2.146 3.967-3.483 4.09l.063 1.107c.05 0 4.654-.038 5.446-5.03zm-11.233 1.432c-1.122-1.253-2.946-1.253-4.068 0-1.122 1.252-1.122 3.284 0 4.537L10.5 17l1.92-2.083c1.122-1.253 1.122-3.285 0-4.537z"/></svg>
+</a>
+
+<div id="ui">
+    <h2>Colores & Cuadrícula</h2>
+    <div class="group">
+        <label>Colores Base</label>
+        <div class="row">
+            <div class="color-pair">
+                <input type="color" id="color_a" value="#212126">
+                <input type="text" id="hex_a" value="#212126">
+            </div>
+            <span style="font-size: 10px;">Color A</span>
+        </div>
+        <div class="row">
+            <div class="color-pair">
+                <input type="color" id="color_b" value="#2e2e38">
+                <input type="text" id="hex_b" value="#2E2E38">
+            </div>
+            <span style="font-size: 10px;">Color B</span>
+        </div>
+        <button class="btn-swap" onclick="swapColors()">INTERCAMBIAR COLORES</button>
+        
+        <div class="row">
+            <input type="color" id="line_color" value="#0d0d0d">
+            <input type="text" id="hex_line" value="#0D0D0D">
+            <span style="font-size: 10px;">Líneas</span>
+        </div>
+        
+        <label>Celdas X / Y</label>
+        <div class="row"><input type="range" id="cell_x_s" min="1" max="100" value="10"><input type="number" id="cell_x" value="10"></div>
+        <div class="row"><input type="range" id="cell_y_s" min="1" max="100" value="10"><input type="number" id="cell_y" value="10"></div>
+        
+        <label>Grosor Línea</label>
+        <div class="row"><input type="range" id="line_thickness_s" min="0" max="0.5" step="0.01" value="0.06"><input type="number" id="line_thickness" value="0.06" step="0.01"></div>
+    </div>
+
+    <h2>Efectos</h2>
+    <div class="group">
+        <label class="check-row"><input type="checkbox" id="parallax_enabled" checked> Parallax</label>
+        <div class="row"><input type="range" id="p_speed_s" min="0" max="2" step="0.01" value="0.1"><input type="number" id="p_speed" value="0.1"></div>
+        <label class="check-row"><input type="checkbox" id="waves_enabled" checked> Ondas</label>
+        <div class="row"><input type="range" id="w_amp_s" min="0" max="0.2" step="0.001" value="0.011"><input type="number" id="w_amp" value="0.011"></div>
+    </div>
+
+    <div class="group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+        <label>Grabación</label>
+        <button id="recordBtn" onclick="toggleRecording()">GRABAR 3 MINUTOS</button>
+        <button id="stopBtn" onclick="stopRecordingEarly()" style="background: #333; color: #ff4b2b; border: 1px solid #ff4b2b; display: none; margin-top: 8px;">DETENER GRABACIÓN</button>
+        <div id="status">Listo para grabar</div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    function toggleMenu() { document.getElementById('nav-container').classList.toggle('open'); }
+
+    let scene, camera, renderer, material;
+    let mediaRecorder, recordedChunks = [], isRecording = false, timerInterval;
+
+    const fragmentShader = `
+        uniform vec2 u_res; uniform float u_time; uniform vec3 u_color_a, u_color_b, u_line_color;
+        uniform vec2 u_cell_count; uniform float u_line_thickness;
+        uniform bool u_p_enabled, u_w_enabled; uniform vec2 u_p_dir;
+        uniform float u_p_speed, u_p_scale, u_w_amp, u_w_freq, u_w_speed;
+
+        void main() {
+            vec2 uv = gl_FragCoord.xy / u_res.xy;
+            float aspect = u_res.x / u_res.y; uv.x *= aspect;
+            if (u_p_enabled) uv += u_p_dir * u_p_speed * u_time * u_p_scale;
+            if (u_w_enabled) {
+                float phase = uv.x * u_w_freq + u_time * u_w_speed;
+                uv.y += sin(phase * 6.28318) * u_w_amp;
+                uv.x += cos(phase * 6.28318) * (u_w_amp * 0.5);
+            }
+            vec2 g = uv * u_cell_count; vec2 f = fract(g);
+            float checker = mod(floor(g.x) + floor(g.y), 2.0);
+            vec3 color = mix(u_color_a, u_color_b, checker);
+            float line = float(f.x < u_line_thickness || f.y < u_line_thickness || f.x > 1.0 - u_line_thickness || f.y > 1.0 - u_line_thickness);
+            gl_FragColor = vec4(mix(color, u_line_color, line), 1.0);
+        }
+    `;
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                u_time: { value: 0 }, u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+                u_color_a: { value: new THREE.Color(0x212126) }, u_color_b: { value: new THREE.Color(0x2e2e38) },
+                u_line_color: { value: new THREE.Color(0x0d0d0d) }, u_cell_count: { value: new THREE.Vector2(10, 10) },
+                u_line_thickness: { value: 0.06 }, u_p_enabled: { value: true }, u_p_dir: { value: new THREE.Vector2(1.0, 0.5) },
+                u_p_speed: { value: 0.1 }, u_p_scale: { value: 1.0 }, u_w_enabled: { value: true },
+                u_w_amp: { value: 0.011 }, u_w_freq: { value: 2.9 }, u_w_speed: { value: 0.5 }
+            }, fragmentShader
+        });
+
+        scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+        setupUI(); animate();
+    }
+
+    function setupUI() {
+        const u = material.uniforms;
+        const setupColor = (pickerId, textId, uniformKey) => {
+            const picker = document.getElementById(pickerId), text = document.getElementById(textId);
+            const update = (val) => {
+                let color = val.startsWith('#') ? val : '#' + val;
+                if (/^#[0-9A-F]{6}$/i.test(color)) { picker.value = color; text.value = color.toUpperCase(); u[uniformKey].value.set(color); }
+            };
+            picker.oninput = (e) => update(e.target.value); text.oninput = (e) => update(e.target.value);
+        };
+        setupColor('color_a', 'hex_a', 'u_color_a'); setupColor('color_b', 'hex_b', 'u_color_b'); setupColor('line_color', 'hex_line', 'u_line_color');
+        const sync = (idS, idN, callback) => {
+            const s = document.getElementById(idS), n = document.getElementById(idN);
+            const update = (val) => { s.value = n.value = val; callback(parseFloat(val)); };
+            s.oninput = (e) => update(e.target.value); n.oninput = (e) => update(e.target.value);
+        };
+        sync('cell_x_s', 'cell_x', (v) => u.u_cell_count.value.x = v);
+        sync('cell_y_s', 'cell_y', (v) => u.u_cell_count.value.y = v);
+        sync('line_thickness_s', 'line_thickness', (v) => u.u_line_thickness.value = v);
+        document.getElementById('parallax_enabled').onchange = (e) => u.u_p_enabled.value = e.target.checked;
+        sync('p_speed_s', 'p_speed', (v) => u.u_p_speed.value = v);
+        document.getElementById('waves_enabled').onchange = (e) => u.u_w_enabled.value = e.target.checked;
+        sync('w_amp_s', 'w_amp', (v) => u.u_w_amp.value = v);
+    }
+
+    function swapColors() {
+        const aP = document.getElementById('color_a'), bP = document.getElementById('color_b');
+        const aH = document.getElementById('hex_a'), bH = document.getElementById('hex_b');
+        const temp = aP.value; aP.value = bP.value; bP.value = temp;
+        aH.value = aP.value.toUpperCase(); bH.value = bP.value.toUpperCase();
+        material.uniforms.u_color_a.value.set(aP.value); material.uniforms.u_color_b.value.set(bP.value);
+    }
+
+    async function toggleRecording() {
+        if (isRecording) return;
+        const btn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn'), status = document.getElementById('status');
+        const stream = renderer.domElement.captureStream(30); 
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 8000000 });
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `grid_shader_LCDF.webm`; a.click();
+            btn.innerText = "GRABAR 3 MINUTOS"; btn.classList.remove('recording');
+            stopBtn.style.display = "none"; status.innerText = "Listo"; isRecording = false;
+        };
+        mediaRecorder.start(); isRecording = true;
+        btn.innerText = "GRABANDO..."; btn.classList.add('recording'); stopBtn.style.display = "block";
+        const startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const rem = 180000 - (Date.now() - startTime);
+            if (rem <= 0) stopRecordingEarly();
+            else {
+                const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
+                status.innerText = `TIEMPO: ${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        }, 1000);
+    }
+
+    function stopRecordingEarly() { if (mediaRecorder && mediaRecorder.state !== "inactive") { clearInterval(timerInterval); mediaRecorder.stop(); } }
+
+    function animate() {
+        requestAnimationFrame(animate); material.uniforms.u_time.value += 0.01; renderer.render(scene, camera);
+    }
+
+    window.onresize = () => {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight);
+    };
+
+    init();
+</script>
+</body>
+</html>
