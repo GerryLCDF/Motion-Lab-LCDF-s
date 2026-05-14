@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SVG Motion Engine</title>
+    <link rel="icon" href="back.svg" type="image/svg+xml">
+    <style>
+        :root { --accent: #4facfe; --bg-panel: rgba(15, 15, 20, 0.9); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* --- OVERLAY OSCURO PARA EL MENÚ --- */
+        #menu-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: 0.4s;
+            z-index: 900;
+        }
+        #nav-container.open ~ #menu-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* --- MENÚ HAMBURGUESA --- */
+        #nav-container { position: fixed; bottom: 20px; left: 20px; z-index: 1000; }
+        #menu-toggle {
+            width: 50px; height: 50px; background: var(--bg-panel);
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+            cursor: pointer; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; gap: 5px;
+            backdrop-filter: blur(10px); transition: 0.3s;
+        }
+        #menu-toggle span { width: 25px; height: 3px; background: var(--accent); border-radius: 2px; transition: 0.3s; }
+        #menu-items {
+            position: absolute; bottom: 65px; left: 0; width: 260px;
+            background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; backdrop-filter: blur(15px); padding: 10px;
+            display: none; flex-direction: column; gap: 5px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+        }
+        .menu-item {
+            text-decoration: none; padding: 12px 15px; color: white;
+            font-size: 13px; border-radius: 8px; transition: 0.2s;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .menu-item:hover:not(.locked) { background: rgba(79, 172, 254, 0.2); color: var(--accent); transform: translateX(5px); }
+        .menu-item.active { border-left: 3px solid var(--accent); background: rgba(255,255,255,0.05); font-weight: bold; }
+        .menu-item.locked { opacity: 0.4; cursor: default; }
+
+        #nav-container.open #menu-items { display: flex; }
+        #nav-container.open #menu-toggle span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        #nav-container.open #menu-toggle span:nth-child(2) { opacity: 0; }
+        #nav-container.open #menu-toggle span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        /* --- ESTILO ORIGINAL DE TU UI --- */
+        #ui {
+            position: absolute; top: 20px; left: 20px; width: 340px;
+            background: var(--bg-panel); padding: 25px;
+            border-radius: 20px; color: white; border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px); z-index: 100;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            transition: opacity 0.4s ease;
+        }
+
+        h2 { margin: 0 0 20px 0; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+        .group { margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 15px; }
+        label { display: block; font-size: 10px; margin-bottom: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .row { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; }
+        .val-indicator { min-width: 35px; font-family: monospace; color: var(--accent); font-size: 12px; font-weight: bold; text-align: right; }
+        .color-pair { display: flex; align-items: center; gap: 8px; flex: 1; }
+        input[type="color"] { width: 35px; height: 30px; border: none; border-radius: 4px; cursor: pointer; background: none; padding: 0; }
+        input[type="text"] { width: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 5px; border-radius: 4px; font-family: monospace; font-size: 12px; outline: none; }
+        .label-text { font-size: 11px; flex: 1; }
+        input[type="range"] { flex: 1; cursor: pointer; accent-color: var(--accent); }
+        
+        #drop-zone { border: 2px dashed rgba(79, 172, 254, 0.3); padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 20px; cursor: pointer; font-size: 11px; color: rgba(255,255,255,0.8); transition: 0.3s; }
+        #drop-zone:hover { border-color: var(--accent); background: rgba(79, 172, 254, 0.05); }
+        
+        /* BOTONES ORIGINALES */
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        button { width: 100%; border: none; padding: 12px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 11px; }
+        .btn-sec { background: rgba(255,255,255,0.1); }
+        .btn-sec:hover { background: rgba(255,255,255,0.2); }
+        .btn-swap { background: rgba(79, 172, 254, 0.15); border: 1px solid var(--accent); margin-bottom: 10px; color: var(--accent); }
+        .btn-swap:hover { background: var(--accent); color: #000; }
+        .active-btn { background: var(--accent) !important; color: #000; }
+        
+        #recordBtn { background: #ff4757; margin-top: 10px; grid-column: span 2; }
+        #recordBtn.recording { animation: pulse 1.5s infinite; background: #ff6b81; }
+
+        /* KO-FI ORIGINAL */
+        .kofi-button { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; z-index: 100; backdrop-filter: blur(15px); }
+        .kofi-button svg { width: 28px; height: 28px; fill: white; }
+        
+        #welcomeModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: var(--bg-panel); padding: 40px; border-radius: 30px; max-width: 450px; text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+
+        .hidden { opacity: 0; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<canvas id="mainCanvas"></canvas>
+
+<div id="nav-container">
+    <div id="menu-toggle" onclick="toggleMenu()">
+        <span></span><span></span><span></span>
+    </div>
+    <div id="menu-items">
+        <a href="#" class="menu-item active">SVG Motion</a>
+        <a href="Grid Shader.html" class="menu-item">Grid</a>
+        <a href="Discrete Sunset.html" class="menu-item">Discrete Sunset</a>
+        <a href="Fire background.html" class="menu-item">Fire Background</a>
+        <a href="Bubble Dubble.html" class="menu-item">Bubble Dubble</a>
+        <a href="Moving Circles.html" class="menu-item">Moving Circles Pro</a>
+        <a href="Diamond Pattern.html" class="menu-item">Diamond Pattern</a>
+        <a href="Clouds Pixelated.html" class="menu-item">Clouds Pixelated</a>
+        <a href="Jaw Grid.html" class="menu-item">Jaw Grid</a>
+        <a href="Cellular Triangulation.html" class="menu-item">Delaunay Flow</a>         
+        <div class="menu-item locked">other <span class="tag-soon">coming soon...</span></div>
+    </div>
+</div>
+
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+
+<div id="ui">
+    <h2 id="uiTitle">Motion Engine v3.0.1</h2>
+    <div id="drop-zone">SOLTAR ARCHIVO SVG</div>
+    <input type="file" id="fileInput" accept=".svg" style="display:none">
+
+    <div class="group">
+        <label id="labelColors">Colores</label>
+        <div class="row">
+            <span class="label-text" id="labelBg">Fondo:</span>
+            <div class="color-pair">
+                <input type="color" id="color_bg" value="#0a0a0f">
+                <input type="text" id="hex_bg" value="#0A0A0F" maxlength="7">
+            </div>
+        </div>
+        <div class="row">
+            <span class="label-text" id="labelSvg">SVG:</span>
+            <div class="color-pair">
+                <input type="color" id="color_svg" value="#4facfe">
+                <input type="text" id="hex_svg" value="#4FACFE" maxlength="7">
+            </div>
+        </div>
+        <button class="btn-swap" onclick="swapColors()" id="btnSwap">INTERCAMBIAR COLORES</button>
+    </div>
+
+    <div class="group">
+        <label id="labelSpeed">Velocidad de Desplazamiento</label>
+        <div class="row">
+            <input type="range" id="speed_s" min="1" max="150" value="30">
+            <span class="val-indicator" id="speed_val">3.0</span>
+        </div>
+    </div>
+
+    <div class="btn-grid">
+        <button id="pauseBtn" class="btn-sec" onclick="togglePause()">PAUSAR</button>
+        <button id="reverseBtn" class="btn-sec" onclick="toggleReverse()">INVERTIR</button>
+        <button id="recordBtn" onclick="toggleRecording()">GRABAR 3 MINUTOS</button>
+    </div>
+    <div id="status" style="font-size: 10px; text-align: center; color: var(--accent); font-weight: bold; margin-top:10px;"></div>
+</div>
+
+<a href="https://ko-fi.com/gerardom86682" target="_blank" class="kofi-button" id="kofiLink">
+    <svg viewBox="0 0 24 24"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.724c-.304 0-.55.245-.55.55v13.746c0 .305.246.55.55.55s.55-.245.55-.55V5.481h17.15c.01 0 3.324.086 3.931 3.3.589 3.12-2.146 3.967-3.483 4.09l.063 1.107c.05 0 4.654-.038 5.446-5.03zm-11.233 1.432c-1.122-1.253-2.946-1.253-4.068 0-1.122 1.252-1.122 3.284 0 4.537L10.5 17l1.92-2.083c1.122-1.253 1.122-3.285 0-4.537z"/></svg>
+</a>
+
+<script>
+    function toggleMenu() { document.getElementById('nav-container').classList.toggle('open'); }
+
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
+    const fileInput = document.getElementById('fileInput'), dropZone = document.getElementById('drop-zone'), ui = document.getElementById('ui');
+    let img = new Image(), imgLoaded = false, posX = 0, isPaused = false, direction = -1; 
+    let mediaRecorder, recordedChunks = [], isRecording = false, timerInterval, originalSVGText = "";
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.onresize = resize; resize();
+
+    function setupColorSync(pickerId, textId, isSVG = false) {
+        const picker = document.getElementById(pickerId), text = document.getElementById(textId);
+        const update = (val) => {
+            let color = val.startsWith('#') ? val : '#' + val;
+            if (/^#[0-9A-F]{6}$/i.test(color)) {
+                picker.value = color; text.value = color.toUpperCase();
+                if(isSVG && originalSVGText) processSVG(originalSVGText);
+            }
+        };
+        picker.oninput = (e) => update(e.target.value);
+        text.oninput = (e) => update(e.target.value);
+    }
+    setupColorSync('color_bg', 'hex_bg');
+    setupColorSync('color_svg', 'hex_svg', true);
+
+    function togglePause() { 
+        isPaused = !isPaused; 
+        document.getElementById('pauseBtn').innerText = isPaused ? "REANUDAR" : "PAUSAR";
+        document.getElementById('pauseBtn').classList.toggle('active-btn', isPaused);
+    }
+    function toggleReverse() { direction *= -1; document.getElementById('reverseBtn').classList.toggle('active-btn', direction === 1); }
+
+    function swapColors() {
+        const bgP = document.getElementById('color_bg'), svgP = document.getElementById('color_svg');
+        const bgH = document.getElementById('hex_bg'), svgH = document.getElementById('hex_svg');
+        const temp = bgP.value; bgP.value = svgP.value; svgP.value = temp;
+        bgH.value = bgP.value.toUpperCase(); svgH.value = svgP.value.toUpperCase();
+        if(originalSVGText) processSVG(originalSVGText);
+    }
+
+    const speedRange = document.getElementById('speed_s'), speedVal = document.getElementById('speed_val');
+    speedRange.oninput = () => speedVal.innerText = (speedRange.value / 10).toFixed(1);
+
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFile(e.target.files[0]);
+    window.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = "#4facfe"; };
+    window.ondrop = (e) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
+
+    function handleFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => { originalSVGText = e.target.result; processSVG(originalSVGText); };
+        reader.readAsText(file);
+    }
+
+    function processSVG(svgText) {
+        const parser = new DOMParser(), doc = parser.parseFromString(svgText, 'image/svg+xml'), svgEl = doc.querySelector('svg');
+        if(!svgEl) return;
+        const style = document.createElementNS("http://www.w3.org/2000/svg", "style");
+        style.textContent = `* { fill: ${document.getElementById('color_svg').value} !important; stroke: ${document.getElementById('color_svg').value} !important; }`;
+        svgEl.appendChild(style);
+        const blob = new Blob([new XMLSerializer().serializeToString(doc)], {type: 'image/svg+xml'});
+        img.onload = () => { imgLoaded = true; }; img.src = URL.createObjectURL(blob);
+    }
+
+    function draw() {
+        ctx.fillStyle = document.getElementById('color_bg').value;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (imgLoaded) {
+            const speed = (speedRange.value / 10), scale = canvas.height / img.height, sw = img.width * scale;
+            if (!isPaused) posX += speed * direction;
+            if (posX <= -sw) posX += sw; if (posX >= 0) posX -= sw;
+            for (let i = -1; i < Math.ceil(canvas.width / sw) + 2; i++) {
+                ctx.drawImage(img, Math.floor(posX + (i * sw)), 0, Math.ceil(sw) + 1, canvas.height);
+            }
+        }
+        requestAnimationFrame(draw);
+    }
+    draw();
+
+    async function toggleRecording() {
+        if (isRecording || !imgLoaded) return;
+        const btn = document.getElementById('recordBtn');
+        const stream = canvas.captureStream(60); 
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 15000000 });
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob), a = document.createElement('a');
+            a.href = url; a.download = `motion_capture_LCDF.webm`; a.click();
+            btn.innerText = "GRABAR 3 MINUTOS"; btn.classList.remove('recording');
+            isRecording = false; ui.classList.remove('hidden');
+        };
+        mediaRecorder.start(); isRecording = true;
+        btn.innerText = "GRABANDO..."; btn.classList.add('recording'); ui.classList.add('hidden');
+        const startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const rem = 180000 - (Date.now() - startTime);
+            if (rem <= 0) { clearInterval(timerInterval); mediaRecorder.stop(); }
+            else {
+                const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
+                document.getElementById('status').innerText = `GRABANDO: ${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        }, 1000);
+    }
+
+    window.onmousemove = (e) => {
+        if (e.clientX < 380 || e.clientX > window.innerWidth - 100 || !isRecording) {
+            ui.classList.remove('hidden'); document.getElementById('kofiLink').style.opacity = "1";
+        } else {
+            ui.classList.add('hidden'); document.getElementById('kofiLink').style.opacity = "0";
+        }
+    };
+</script>
+</body>
+</html>

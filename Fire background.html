@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Fire Background</title>
+    <link rel="icon" href="back.svg" type="image/svg+xml">
+    <style>
+        :root { --accent: #4facfe; --bg-panel: rgba(15, 15, 20, 0.9); }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        /* --- NAVEGACIÓN & OVERLAY --- */
+        #menu-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: 0.4s; z-index: 900; }
+        #nav-container.open ~ #menu-overlay { opacity: 1; pointer-events: auto; }
+        #nav-container { position: fixed; bottom: 20px; left: 20px; z-index: 1000; }
+        #menu-toggle { width: 50px; height: 50px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; backdrop-filter: blur(10px); transition: 0.3s; }
+        #menu-toggle span { width: 25px; height: 3px; background: var(--accent); border-radius: 2px; transition: 0.3s; }
+        #menu-items { position: absolute; bottom: 65px; left: 0; width: 260px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; backdrop-filter: blur(15px); padding: 10px; display: none; flex-direction: column; gap: 5px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .menu-item { text-decoration: none; padding: 12px 15px; color: white; font-size: 13px; border-radius: 8px; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; }
+        .menu-item:hover { background: rgba(79, 172, 254, 0.2); color: var(--accent); transform: translateX(5px); }
+        .menu-item.active { border-left: 3px solid var(--accent); background: rgba(255,255,255,0.05); font-weight: bold; }
+        #nav-container.open #menu-items { display: flex; }
+        #nav-container.open #menu-toggle span:nth-child(1) { transform: translateY(8px) rotate(45deg); }
+        #nav-container.open #menu-toggle span:nth-child(2) { opacity: 0; }
+        #nav-container.open #menu-toggle span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
+
+        /* --- PANEL UI --- */
+        #ui { position: absolute; top: 20px; left: 20px; width: 340px; background: var(--bg-panel); padding: 25px; border-radius: 20px; color: white; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(15px); z-index: 100; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        h2 { margin: 0 0 15px 0; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .group { margin-bottom: 15px; }
+        label { display: block; font-size: 10px; margin-bottom: 8px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+        .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .label-text { font-size: 11px; width: 70px; color: rgba(255,255,255,0.8); }
+        input[type="range"] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+        input[type="number"] { width: 55px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--accent); border-radius: 4px; padding: 4px; font-family: monospace; font-size: 11px; text-align: center; outline: none; }
+        .color-pair { display: flex; align-items: center; gap: 8px; flex: 1; }
+        input[type="color"] { width: 35px; height: 30px; border: none; border-radius: 4px; cursor: pointer; background: none; }
+        input[type="text"] { width: 80px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 4px; border-radius: 4px; font-family: monospace; font-size: 11px; outline: none; }
+        button { width: 100%; border: none; padding: 12px; color: white; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.3s; font-size: 11px; }
+        .btn-swap { background: rgba(79, 172, 254, 0.15); border: 1px solid var(--accent); color: var(--accent); margin-bottom: 10px; }
+        #recordBtn { background: var(--accent); color: #000; margin-top: 10px; }
+        #recordBtn.recording { background: #ff4b2b; color: white; animation: pulse 1.5s infinite; }
+        #stopBtn { background: #333; color: #ff4b2b; border: 1px solid #ff4b2b; display: none; margin-top: 8px; }
+        #status { font-size: 10px; color: var(--accent); margin-top: 12px; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+        .kofi-button { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(15px); }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<div id="nav-container">
+    <div id="menu-toggle" onclick="toggleMenu()"><span></span><span></span><span></span></div>
+    <div id="menu-items">
+        <a href="index.html" class="menu-item">SVG Motion</a>
+        <a href="Grid Shader.html" class="menu-item ">Grid</a>
+        <a href="Discrete Sunset.html" class="menu-item">Discrete Sunset</a>
+        <a href="#" class="menu-item active">Fire Background</a>
+        <a href="Bubble Dubble.html" class="menu-item">Bubble Dubble</a>
+        <a href="Moving Circles.html" class="menu-item">Moving Circles Pro</a>
+        <a href="Diamond Pattern.html" class="menu-item">Diamond Pattern</a>
+        <a href="Clouds Pixelated.html" class="menu-item">Clouds Pixelated</a>
+        <a href="Jaw Grid.html" class="menu-item">Jaw Grid</a>
+        <a href="Cellular Triangulation.html" class="menu-item">Delaunay Flow</a>         
+        <div class="menu-item locked">other <span class="tag-soon">coming soon...</span></div>
+    </div>
+</div>
+<div id="menu-overlay" onclick="toggleMenu()"></div>
+
+<div id="ui">
+    <h2>Fire Background</h2>
+    <div class="group">
+        <label>Colores</label>
+        <div class="row">
+            <span class="label-text">Superior:</span>
+            <div class="color-pair"><input type="color" id="color_top" value="#fcb42c"><input type="text" id="hex_top" value="#FCB42C"></div>
+        </div>
+        <div class="row">
+            <span class="label-text">Inferior:</span>
+            <div class="color-pair"><input type="color" id="color_bottom" value="#601510"><input type="text" id="hex_bottom" value="#601510"></div>
+        </div>
+        <button class="btn-swap" onclick="swapColors()">INTERCAMBIAR</button>
+    </div>
+    <div class="group">
+        <label>Parámetros</label>
+        <div class="row"><span class="label-text">Capas</span><input type="range" id="layers_s" min="2" max="80" step="1" value="44"><input type="number" id="layers_n" value="44"></div>
+        <div class="row"><span class="label-text">Velocidad</span><input type="range" id="speed_s" min="0" max="1" step="0.01" value="0.16"><input type="number" id="speed_n" value="0.16"></div>
+        <div class="row"><span class="label-text">Intensidad</span><input type="range" id="intensity_s" min="0" max="1" step="0.01" value="0.5"><input type="number" id="intensity_n" value="0.5"></div>
+        <div class="row"><span class="label-text">Detalle</span><input type="range" id="size_s" min="0.1" max="10.0" step="0.01" value="5"><input type="number" id="size_n" value="5"></div>
+    </div>
+    <div class="group" style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 15px;">
+        <button id="recordBtn" onclick="toggleRecording()">GRABAR 3 MINUTOS</button>
+        <button id="stopBtn" onclick="stopRecordingEarly()">DETENER GRABACIÓN</button>
+        <div id="status">Listo</div>
+    </div>
+</div>
+
+<a href="https://ko-fi.com/gerardom86682" target="_blank" class="kofi-button"><svg viewBox="0 0 24 24" width="28" height="28" fill="white"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.724c-.304 0-.55.245-.55.55v13.746c0 .305.246.55.55.55s.55-.245.55-.55V5.481h17.15c.01 0 3.324.086 3.931 3.3.589 3.12-2.146 3.967-3.483 4.09l.063 1.107c.05 0 4.654-.038 5.446-5.03zm-11.233 1.432c-1.122-1.253-2.946-1.253-4.068 0-1.122 1.252-1.122 3.284 0 4.537L10.5 17l1.92-2.083c1.122-1.253 1.122-3.285 0-4.537z"/></svg></a>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+    function toggleMenu() { document.getElementById('nav-container').classList.toggle('open'); }
+    let scene, camera, renderer, material;
+    let mediaRecorder, recordedChunks = [], isRecording = false, timerInterval;
+
+    const fragmentShader = `
+        uniform vec2 u_res; uniform float u_time; uniform vec3 u_top_color; uniform vec3 u_bottom_color;
+        uniform float u_layer_count; uniform float u_time_scale; uniform float u_base_intensity; uniform float u_size;
+
+        vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+        float snoise(vec2 v){
+          const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+          vec2 i  = floor(v + dot(v, C.yy) );
+          vec2 x0 = v -   i + dot(i, C.xx);
+          vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+          vec4 x12 = x0.xyxy + C.xxzz;
+          x12.xy -= i1;
+          i = mod(i, 289.0);
+          vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+          vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+          m = m*m ; m = m*m ;
+          vec3 x = 2.0 * fract(p * C.www) - 1.0;
+          vec3 h = abs(x) - 0.5;
+          vec3 a0 = x - floor(x + 0.5);
+          m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+          vec3 g;
+          g.x  = a0.x  * x0.x  + h.x  * x0.y;
+          g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+          return 130.0 * dot(m, g);
+        }
+
+        float rand(float n){ return fract(sin(n) * 43758.5453123); }
+
+        bool fire_layer(vec2 uv, float h) {
+            float inner = 1.0 - pow(uv.y - h, 2.0);
+            float beam = (inner > 0.0) ? sqrt(inner) : 0.0;
+            float n = snoise(vec2(uv.x * u_size + rand(h), uv.y * u_size - u_time * u_time_scale));
+            n = (n + 1.0) * 0.5; 
+            return uv.y - beam * u_base_intensity * n < h;
+        }
+
+        void main() {
+            vec2 uv = gl_FragCoord.xy / u_res.xy;
+            vec3 color = u_bottom_color;
+            for (int i = 0; i < 80; i++) {
+                if(float(i) >= u_layer_count) break;
+                float h = float(i) / (u_layer_count - 1.0);
+                if (fire_layer(uv, h)) { color = mix(u_bottom_color, u_top_color, h); break; }
+            }
+            gl_FragColor = vec4(color, 1.0);
+        }
+    `;
+
+    function init() {
+        scene = new THREE.Scene();
+        camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        material = new THREE.ShaderMaterial({
+            uniforms: {
+                u_time: { value: 0 }, u_res: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+                u_top_color: { value: new THREE.Color(0xfcb42c) }, u_bottom_color: { value: new THREE.Color(0x601510) },
+                u_layer_count: { value: 44.0 }, u_time_scale: { value: 0.16 },
+                u_base_intensity: { value: 0.5 }, u_size: { value: 5.0 }
+            },
+            fragmentShader
+        });
+
+        scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+        setupUI(); animate();
+    }
+
+    function setupUI() {
+        const u = material.uniforms;
+        const syncColor = (pId, tId, key) => {
+            const p = document.getElementById(pId), t = document.getElementById(tId);
+            const upd = (v) => { p.value = v; t.value = v.toUpperCase(); u[key].value.set(v); };
+            p.oninput = (e) => upd(e.target.value);
+            t.oninput = (e) => { if(/^#[0-9A-F]{6}$/i.test(e.target.value)) upd(e.target.value); };
+        };
+        syncColor('color_top', 'hex_top', 'u_top_color');
+        syncColor('color_bottom', 'hex_bottom', 'u_bottom_color');
+
+        const syncParam = (sId, nId, key) => {
+            const s = document.getElementById(sId), n = document.getElementById(nId);
+            const upd = (v) => { s.value = v; n.value = v; u[key].value = parseFloat(v); };
+            s.oninput = n.oninput = (e) => upd(e.target.value);
+        };
+        syncParam('layers_s', 'layers_n', 'u_layer_count');
+        syncParam('speed_s', 'speed_n', 'u_time_scale');
+        syncParam('intensity_s', 'intensity_n', 'u_base_intensity');
+        syncParam('size_s', 'size_n', 'u_size');
+    }
+
+    function swapColors() {
+        const t = document.getElementById('color_top'), b = document.getElementById('color_bottom');
+        const tmp = t.value; t.value = b.value; b.value = tmp;
+        t.dispatchEvent(new Event('input')); b.dispatchEvent(new Event('input'));
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        material.uniforms.u_time.value += 0.05;
+        renderer.render(scene, camera);
+    }
+
+    async function toggleRecording() {
+        if (isRecording) return;
+        const btn = document.getElementById('recordBtn'), stopBtn = document.getElementById('stopBtn'), status = document.getElementById('status');
+        const stream = renderer.domElement.captureStream(30);
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 8000000 });
+        recordedChunks = [];
+        mediaRecorder.ondataavailable = (e) => recordedChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob), a = document.createElement('a');
+            a.href = url; a.download = `fire_background_LCDF.webm`; a.click();
+            btn.innerText = "GRABAR 3 MINUTOS"; btn.classList.remove('recording'); stopBtn.style.display = "none"; isRecording = false;
+        };
+        mediaRecorder.start(); isRecording = true;
+        btn.innerText = "GRABANDO..."; btn.classList.add('recording'); stopBtn.style.display = "block";
+        const startTime = Date.now();
+        timerInterval = setInterval(() => {
+            const rem = 180000 - (Date.now() - startTime);
+            if (rem <= 0) stopRecordingEarly();
+            else {
+                const m = Math.floor(rem / 60000), s = Math.floor((rem % 60000) / 1000);
+                status.innerText = `TIEMPO: ${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+        }, 1000);
+    }
+
+    function stopRecordingEarly() { if (mediaRecorder && mediaRecorder.state !== "inactive") { clearInterval(timerInterval); mediaRecorder.stop(); } }
+    window.onresize = () => { renderer.setSize(window.innerWidth, window.innerHeight); material.uniforms.u_res.value.set(window.innerWidth, window.innerHeight); };
+    init();
+</script>
+</body>
+</html>
